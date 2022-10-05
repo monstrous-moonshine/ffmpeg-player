@@ -1,3 +1,23 @@
+BUILD = debug
 CFLAGS = -Wall -Wextra
-LDLIBS = -lavformat -lavcodec -lavutil
-player: player.c
+ifeq ($(BUILD),debug)
+    CFLAGS += -g -Og
+else
+    CFLAGS += -01 -DNDEBUG
+endif
+LDLIBS = -lSDL2 -lavformat -lavcodec -lswresample -lswscale -lavutil
+
+SRCS = app.c player.c queue.c
+OBJS = $(SRCS:%.c=build/%.o)
+
+player: $(OBJS)
+	$(CC) -o $@ $^ $(LDLIBS)
+
+build/%.o: %.c
+	@mkdir -p build
+	$(CC) -c -o $@ $(CFLAGS) $<
+
+clean:
+	$(RM) player $(OBJS)
+
+.PHONY: clean
