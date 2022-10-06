@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <libavformat/avformat.h>
 #include "queue.h"
 
 bool queue_init(Queue *queue) {
@@ -18,7 +20,7 @@ void queue_fini(Queue *queue) {
     SDL_DestroyCond(queue->empty);
     SDL_DestroyCond(queue->fill);
     SDL_DestroyMutex(queue->mutex);
-    // TODO: free the remaining AVFrame's too
+    queue_flush(queue);
 }
 
 void queue_enqueue(Queue *queue, entry_t entry) {
@@ -32,4 +34,13 @@ entry_t queue_dequeue(Queue *queue) {
     queue->use_ptr = (queue->use_ptr + 1) % QUEUE_MAX;
     queue->count--;
     return tmp;
+}
+
+void queue_flush(Queue *queue) {
+    for (int i = queue->use_ptr; i != queue->fill_ptr; i = (i + 1) % QUEUE_MAX) {
+        av_frame_free(&queue->buffer[i].frame);
+    }
+    queue->use_ptr = queue->fill_ptr;
+    queue->count = 0;
+    assert(SDL_CondSignal(queue->empty) == 0);
 }

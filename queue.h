@@ -23,3 +23,4 @@ bool queue_init(Queue *queue);
 void queue_fini(Queue *queue);
 void queue_enqueue(Queue *queue, entry_t entry);
 entry_t queue_dequeue(Queue *queue);
+void queue_flush(Queue *queue);
