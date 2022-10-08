@@ -3,6 +3,7 @@
 #include <libavcodec/avcodec.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
+#include <SDL2/SDL.h>
 #include "app.h"
 #include "decode.h"
 #include "macro.h"
@@ -295,9 +296,13 @@ int main(int argc, char *argv[]) {
         } else {
             _cleanup_(av_frame_free) AVFrame *resampled;
             resampled = resample_frame(&app, entry.frame);
+            int sample_size = av_get_bytes_per_sample(resampled->format);
             int datasize = resampled->ch_layout.nb_channels *
-                resampled->nb_samples *
-                av_get_bytes_per_sample(resampled->format);
+                resampled->nb_samples * sample_size;
+            float volume = app.muted ? 0 : app.volume;
+            for (int i = 0; i < datasize / sample_size; i++) {
+                ((float*)resampled->data[0])[i] *= volume;
+            }
             assert(SDL_QueueAudio(app.audio_devID, resampled->data[0],
                         datasize) == 0);
             SDL_PauseAudioDevice(app.audio_devID, 0);
