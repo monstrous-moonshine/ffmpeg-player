@@ -10,7 +10,7 @@
 
 /* DONE: add av_strerror() strings to error messages */
 
-extern thread_param_t avparam;
+extern avparam_t avparam;
 extern Queue video_queue;
 extern Queue audio_queue;
 

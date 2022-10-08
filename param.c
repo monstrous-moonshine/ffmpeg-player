@@ -1,6 +1,7 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <SDL2/SDL.h>
+#include <stdio.h>
 #include "macro.h"
 #include "param.h"
 #include "util.h"
@@ -38,7 +39,7 @@ static bool get_codec_context(AVFormatContext *avctx,
     return true;
 }
 
-bool avparam_init(thread_param_t *param, const char *url) {
+bool avparam_init(avparam_t *param, const char *url) {
     int err;
     bool ret;
 
@@ -50,11 +51,10 @@ bool avparam_init(thread_param_t *param, const char *url) {
     }
     err = avformat_find_stream_info(param->avctx, NULL);
     if (err < 0) {
-        LOG_ERROR("Error getting stream information: %s\n",
-                my_avstrerror(err));
+        LOG_ERROR("Error getting stream info: %s\n", my_avstrerror(err));
         return false;
     }
-    // av_dump_format(avctx, 0, argv[1], 0);
+    // av_dump_format(param->avctx, 0, url, 0);
 
     param->video_si = av_find_best_stream(
             param->avctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
@@ -89,7 +89,7 @@ bool avparam_init(thread_param_t *param, const char *url) {
     return true;
 }
 
-void avparam_fini(thread_param_t *param) {
+void avparam_fini(avparam_t *param) {
     avcodec_free_context(&param->video_ctx);
     avcodec_free_context(&param->audio_ctx);
     avformat_close_input(&param->avctx);

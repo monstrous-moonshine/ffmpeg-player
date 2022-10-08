@@ -2,4 +2,5 @@ player
 build
 .gdb_history
 test.mkv
-plot
+audio_cnt
+video_cnt

@@ -8,7 +8,7 @@
 
 /* TODO: add SDL_GetError() strings to error messages */
 
-extern thread_param_t avparam;
+extern avparam_t avparam;
 
 static void reset_viewport(App *app) {
     int viewport_width, viewport_height;
@@ -184,6 +184,12 @@ void process_events(App *app) {
                 break;
             case SDLK_DOWN:
                 seek(app, -60000);
+                break;
+            case SDLK_PAGEUP:
+                seek(app, 600000);
+                break;
+            case SDLK_PAGEDOWN:
+                seek(app, -600000);
                 break;
             }
             break;

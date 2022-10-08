@@ -1,9 +1,12 @@
 #include <assert.h>
-#include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 #include <SDL2/SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "app.h"
 #include "decode.h"
 #include "macro.h"
@@ -12,7 +15,7 @@
 
 Queue video_queue;
 Queue audio_queue;
-thread_param_t avparam;
+avparam_t avparam;
 static SDL_Thread *fetch_thread = NULL;
 
 static void sws_freectxp(struct SwsContext **pctx) {
@@ -38,7 +41,7 @@ static void rescale_frame(App *app, AVFrame *frame) {
             app->viewport.w, app->viewport.h, AV_PIX_FMT_RGBA,
             SWS_BILINEAR, NULL, NULL, NULL);
     if (!sws_ctx) {
-        fprintf(stderr, "Error getting swscale context\n");
+        LOG_ERROR("Error getting swscale context\n");
         exit(1);
     }
 
@@ -50,7 +53,7 @@ static void rescale_frame(App *app, AVFrame *frame) {
             sws_ctx, (const uint8_t * const *)frame->data,
             frame->linesize, 0, frame->height, pixels, pitch);
     if (ret != app->viewport.h) {
-        fprintf(stderr, "Error scaling frame\n");
+        LOG_ERROR("Error scaling frame\n");
         exit(1);
     }
     SDL_UnlockTexture(app->tex);
@@ -61,13 +64,13 @@ static AVFrame *resample_frame(SDL_AudioSpec *spec, AVFrame *frame) {
 
     _cleanup_(av_frame_free) AVFrame *resampled = av_frame_alloc();
     if (!resampled) {
-        fprintf(stderr, "Error allocating frame\n");
+        LOG_ERROR("Error allocating frame\n");
         exit(1);
     }
 #ifdef KEEP_CHANNEL_LAYOUT
     if (av_channel_layout_copy(&resampled->ch_layout,
                 &frame->ch_layout) < 0) {
-        fprintf(stderr, "Error copying channel layout\n");
+        LOG_ERROR("Error copying channel layout\n");
         exit(1);
     }
 #else
@@ -87,16 +90,16 @@ static AVFrame *resample_frame(SDL_AudioSpec *spec, AVFrame *frame) {
             NULL
             );
     if (err < 0) {
-        fprintf(stderr, "Error setting swresample context\n");
+        LOG_ERROR("Error setting swresample context\n");
         exit(1);
     }
     if (swr_init(swr) < 0) {
-        fprintf(stderr, "Error initializing swresample context\n");
+        LOG_ERROR("Error initializing swresample context\n");
         exit(1);
     }
     err = swr_convert_frame(swr, resampled, frame);
     if (err < 0) {
-        fprintf(stderr, "Error resampling frame\n");
+        LOG_ERROR("Error resampling frame\n");
         exit(1);
     }
     return TAKE_PTR(resampled);
@@ -164,7 +167,7 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
 
 int main(int argc, char *argv[]) {
     _cleanup_(app_fini) App app = {};
-    avparam = (thread_param_t) {};
+    avparam = (avparam_t) {};
     video_queue = (Queue) {};
     audio_queue = (Queue) {};
 

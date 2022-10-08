@@ -1,10 +1,8 @@
 #pragma once
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <SDL2/SDL.h>
 #include <stdbool.h>
-
-typedef struct AVFormatContext AVFormatContext;
-typedef struct AVCodecContext  AVCodecContext;
-typedef struct SDL_mutex SDL_mutex;
-typedef struct SDL_cond  SDL_cond;
 
 typedef struct {
     AVFormatContext *avctx;
@@ -19,7 +17,7 @@ typedef struct {
     long seek_pts;
 
     bool done;
-} thread_param_t;
+} avparam_t;
 
-bool avparam_init(thread_param_t *param, const char *url);
-void avparam_fini(thread_param_t *param);
+bool avparam_init(avparam_t *param, const char *url);
+void avparam_fini(avparam_t *param);

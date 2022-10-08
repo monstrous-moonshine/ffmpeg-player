@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+import matplotlib.pyplot as plt
+import sys
+
+data = []
+for filename in sys.argv[1:]:
+    with open(filename, "r") as f:
+        data.append([int(s) for s in f])
+
+fig, ax = plt.subplots()
+for lst in data:
+    ax.plot(lst)
+
+plt.show()
