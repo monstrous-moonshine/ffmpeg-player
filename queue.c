@@ -14,6 +14,8 @@ bool queue_init(Queue *queue, const char *name) {
     queue->mutex = SDL_CreateMutex();
 #ifdef QUEUE_LOG_COUNT
     queue->fp = fopen(name, "w");
+#else
+    (void)name;
 #endif
     return (
             queue->empty &&

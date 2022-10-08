@@ -22,11 +22,7 @@ typedef struct {
 #endif
 } Queue;
 
-bool queue_init(Queue *queue
-#ifdef QUEUE_LOG_COUNT
-        , const char *name
-#endif
-        );
+bool queue_init(Queue *queue, const char *name);
 void queue_fini(Queue *queue);
 void queue_enqueue(Queue *queue, AVFrame *frame);
 AVFrame *queue_dequeue(Queue *queue);

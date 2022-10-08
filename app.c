@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <libavformat/avformat.h>
 #include <SDL2/SDL.h>
+#include <stdio.h>
 #include "app.h"
 #include "macro.h"
 #include "param.h"
@@ -40,7 +41,7 @@ bool app_init(App *app,
     reset_viewport(app);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "Error initializing SDL\n");
+        LOG_ERROR("Error initializing SDL\n");
         return false;
     }
 
@@ -49,7 +50,7 @@ bool app_init(App *app,
             SDL_AUDIO_ALLOW_FREQUENCY_CHANGE |
             SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
     if (app->audio_devID == 0) {
-        fprintf(stderr, "Error opening audio device\n");
+        LOG_ERROR("Error opening audio device\n");
         return false;
     }
 
@@ -60,7 +61,7 @@ bool app_init(App *app,
             app->width, app->height,
             SDL_WINDOW_RESIZABLE);
     if (!app->win) {
-        fprintf(stderr, "Error creating window\n");
+        LOG_ERROR("Error creating window\n");
         return false;
     }
 
@@ -68,7 +69,7 @@ bool app_init(App *app,
             app->win, -1, SDL_RENDERER_ACCELERATED |
                           SDL_RENDERER_PRESENTVSYNC);
     if (!app->ren) {
-        fprintf(stderr, "Error creating renderer\n");
+        LOG_ERROR("Error creating renderer\n");
         return false;
     }
 
@@ -77,7 +78,7 @@ bool app_init(App *app,
             SDL_TEXTUREACCESS_STREAMING,
             app->width, app->height);
     if (!app->tex) {
-        fprintf(stderr, "Error creating texture\n");
+        LOG_ERROR("Error creating texture\n");
         return false;
     }
 
@@ -104,18 +105,32 @@ void app_fini(App *app) {
 }
 
 static void seek(App *app, int delta) {
+    // although AVSEEK_FLAG_BACKWARD is ignored for
+    // avformat_seek_file(), it's NOT ignored for
+    // av_seek_frame(), so this flag is required
+    // for seeking backward beyond a certain limit
     avparam.seek_flags = delta < 0 ? AVSEEK_FLAG_BACKWARD : 0;
     avparam.seek_pts = app->pts + delta;
 
     assert(SDL_LockMutex(avparam.seek_mtx) == 0);
     avparam.do_seek = true;
     while (avparam.do_seek) {
-        assert(SDL_CondWait(avparam.seek_done,
-                    avparam.seek_mtx) == 0);
+        // instead of one (potentially infinite) wait, we wait
+        // in short spans, while checking if the fetch thread
+        // (which will service the seek) is still alive
+        // this is to account for the case when the fetch thread
+        // has exited because of some error, so we don't wait
+        // forever
+        int err = SDL_CondWaitTimeout(avparam.seek_done,
+                avparam.seek_mtx, DEFAULT_FRAME_DELAY);
+        assert(err >= 0);
+        if (avparam.done) {
+            assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
+            return;
+        }
     }
     assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
 
-    SDL_ClearQueuedAudio(app->audio_devID);
     app->t_start = -1;
 }
 
@@ -151,10 +166,10 @@ void process_events(App *app) {
                 app->muted = !app->muted;
                 break;
             case SDLK_9:
-                app->volume = max(app->volume - 0.1f, 0.0f);
+                app->volume = max(app->volume - 0.05f, 0.0f);
                 break;
             case SDLK_0:
-                app->volume = min(app->volume + 0.1f, 1.0f);
+                app->volume = min(app->volume + 0.05f, 1.0f);
                 break;
             case SDLK_RIGHT:
                 seek(app, 10000);

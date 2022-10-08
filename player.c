@@ -178,15 +178,8 @@ int main(int argc, char *argv[]) {
     if (!avparam_init(&avparam, argv[1]))
         exit(1);
 
-    if (!queue_init(&video_queue
-#ifdef QUEUE_LOG_COUNT
-                , "queue_log_count_video"
-#endif
-                ) || !queue_init(&audio_queue
-#ifdef QUEUE_LOG_COUNT
-                    , "queue_log_count_audio"
-#endif
-                    )) {
+    if (!queue_init(&video_queue , "video_cnt") ||
+            !queue_init(&audio_queue , "audio_cnt")) {
         LOG_ERROR("Error initializing frame queue\n");
         exit(1);
     }
