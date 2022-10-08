@@ -3,12 +3,7 @@
 #include <SDL2/SDL.h>
 #include "macro.h"
 #include "param.h"
-
-static const char *my_avstrerror(int err) {
-    static char buffer[AV_ERROR_MAX_STRING_SIZE];
-    (void)av_strerror(err, buffer, AV_ERROR_MAX_STRING_SIZE);
-    return buffer;
-}
+#include "util.h"
 
 static bool get_codec_context(AVFormatContext *avctx,
         int stream_index, AVCodecContext **out) {

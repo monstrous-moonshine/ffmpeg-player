@@ -26,9 +26,9 @@
     })
 #define LOG_ERROR(fmt, ...) \
     ({ \
-        fprintf(stderr, "\\[\e[31m\\]"); \
+        fprintf(stderr, "\e[31m"); \
         fprintf(stderr, "%s:%d:%s: ", __FILE__, __LINE__, __FUNCTION__); \
         fprintf(stderr, fmt, ## __VA_ARGS__); \
-        fprintf(stderr, "\\[\e[0m\\]"); \
+        fprintf(stderr, "\e[0m"); \
         (void)0; \
     })

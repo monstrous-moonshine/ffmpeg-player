@@ -6,8 +6,9 @@
 #include "macro.h"
 #include "param.h"
 #include "queue.h"
+#include "util.h"
 
-/* TODO: add av_strerror() strings to error messages */
+/* DONE: add av_strerror() strings to error messages */
 
 extern thread_param_t avparam;
 extern Queue video_queue;
@@ -18,10 +19,12 @@ static void unlockp(SDL_mutex **pmtx) {
 }
 
 static void seek() {
-    if (av_seek_frame(avparam.avctx, -1,
-                avparam.seek_pts * 1000,
-                avparam.seek_flags) < 0) {
-        LOG_ERROR("Error seeking to frame\n");
+    int err = av_seek_frame(avparam.avctx, -1,
+            avparam.seek_pts * 1000,
+            avparam.seek_flags);
+    if (err < 0) {
+        LOG_ERROR("Error seeking to frame: %s\n",
+                my_avstrerror(err));
         return;
     }
     /* avformat_flush(thread_params.avctx); */
@@ -50,7 +53,8 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
             if (err == AVERROR_EOF) {
                 return err;
             } else if (err < 0) {
-                LOG_ERROR("Error reading frame\n");
+                LOG_ERROR("Error reading frame: %s\n",
+                        my_avstrerror(err));
                 return err;
             }
             *pcodec_ctx =
@@ -64,14 +68,16 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
 
         err = avcodec_send_packet(*pcodec_ctx, pkt);
         if (err < 0) {
-            LOG_ERROR("Error sending packet to decoder\n");
+            LOG_ERROR("Error sending packet to decoder: %s\n",
+                    my_avstrerror(err));
             return err;
         }
 
         err = avcodec_receive_frame(*pcodec_ctx, frame);
     }
     if (err < 0) {
-        LOG_ERROR("Error receiving frame from decoder\n");
+        LOG_ERROR("Error receiving frame from decoder: %s\n",
+                my_avstrerror(err));
         return err;
     }
 
@@ -132,8 +138,11 @@ int fetch_frames(void *ptr) {
         }
 
         err = read_frame(&codec_ctx, frame, &stream_index);
-        if (err == AVERROR_EOF)
+        if (err == AVERROR_EOF) {
+            // wait a bit so we don't spin too fast at EOF
+            SDL_Delay(DEFAULT_FRAME_DELAY);
             continue;
+        }
         else if (err < 0) {
             avparam.done = true;
             return err;

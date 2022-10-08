@@ -6,6 +6,8 @@
 #include "macro.h"
 #include "param.h"
 
+/* TODO: add SDL_GetError() strings to error messages */
+
 extern thread_param_t avparam;
 
 static void reset_viewport(App *app) {
