@@ -38,10 +38,13 @@ bool app_init(App *app,
     app->display_aspect.num = display_aspect->num;
     app->display_aspect.den = display_aspect->den;
 
-    app->done = false;
-    app->resized = false;
+    app->volume = 1.0;
+    app->muted = false;
+
     app->width = 640;
     app->height = 480;
+    app->resized = false;
+    app->done = false;
 
     reset_viewport(app);
 
@@ -86,6 +89,8 @@ bool app_init(App *app,
         fprintf(stderr, "Error creating texture\n");
         return false;
     }
+
+    SDL_PauseAudioDevice(app->audio_devID, 0);
 
     return true;
 }
@@ -150,6 +155,15 @@ void process_events(App *app) {
                 break;
             case SDLK_SPACE:
                 toggle_pause(app);
+                break;
+            case SDLK_m:
+                app->muted = !app->muted;
+                break;
+            case SDLK_9:
+                app->volume = max(app->volume - 0.1f, 0.0f);
+                break;
+            case SDLK_0:
+                app->volume = min(app->volume + 0.1f, 1.0f);
                 break;
             case SDLK_RIGHT:
                 seek(app, 10000);

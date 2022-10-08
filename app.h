@@ -21,6 +21,9 @@ typedef struct {
     Rational display_aspect;
     SDL_Rect viewport;
 
+    float volume;
+    bool muted;
+
     int width;
     int height;
     bool resized;
