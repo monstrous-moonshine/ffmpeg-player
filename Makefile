@@ -3,11 +3,11 @@ CFLAGS = -Wall -Wextra
 ifeq ($(BUILD),debug)
     CFLAGS += -g -Og
 else
-    CFLAGS += -01 -DNDEBUG
+    CFLAGS += -02 -DNDEBUG
 endif
 LDLIBS = -lSDL2 -lavformat -lavcodec -lswresample -lswscale -lavutil
 
-SRCS = app.c player.c queue.c
+SRCS = app.c decode.c player.c queue.c
 OBJS = $(SRCS:%.c=build/%.o)
 
 player: $(OBJS)
