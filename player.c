@@ -4,28 +4,47 @@
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 #include "app.h"
+#include "decode.h"
 #include "macro.h"
+#include "param.h"
 #include "queue.h"
 
 Queue frame_queue;
+thread_param_t thread_params;
+static SDL_Thread *fetch_thread = NULL;
 
-static void avctx_freep(AVFormatContext **pformat_ctx) {
+static inline void avctx_freep(AVFormatContext **pformat_ctx) {
     avformat_close_input(pformat_ctx);
     avformat_free_context(*pformat_ctx);
 }
 
-static void sws_freectxp(struct SwsContext **pctx) {
+static inline void sws_freectxp(struct SwsContext **pctx) {
     sws_freeContext(*pctx);
 }
 
-static void entry_freep(entry_t *entry) {
+static inline void entry_freep(entry_t *entry) {
     av_frame_free(&entry->frame);
 }
 
-static const char *my_avstrerror(int err) {
+static inline const char *my_avstrerror(int err) {
     static char buffer[AV_ERROR_MAX_STRING_SIZE];
     av_strerror(err, buffer, AV_ERROR_MAX_STRING_SIZE);
     return buffer;
+}
+
+static void main_exit_handler() {
+    if (fetch_thread) {
+        thread_params.done = true;
+        SDL_WaitThread(fetch_thread, NULL);
+        /* fetch_thread = NULL; */
+    }
+
+    queue_fini(&frame_queue);
+
+    if (thread_params.seek_mtx)
+        SDL_DestroyMutex(thread_params.seek_mtx);
+    if (thread_params.seek_done)
+        SDL_DestroyCond(thread_params.seek_done);
 }
 
 static AVCodecContext *get_codec_context(
@@ -55,145 +74,6 @@ static AVCodecContext *get_codec_context(
         exit(1);
     }
     return codec_ctx;
-}
-
-static bool read_bool_with_lock(SDL_mutex *mutex, bool *var) {
-    assert(SDL_LockMutex(mutex) == 0);
-    bool ret = *var;
-    assert(SDL_UnlockMutex(mutex) == 0);
-    return ret;
-}
-
-static void set_bool_with_lock(SDL_mutex *mutex, bool *var) {
-    assert(SDL_LockMutex(mutex) == 0);
-    *var = true;
-    assert(SDL_UnlockMutex(mutex) == 0);
-}
-
-typedef struct {
-    AVFormatContext *avctx;
-    AVCodecContext *video_ctx;
-    AVCodecContext *audio_ctx;
-    int video_si, audio_si;
-    SDL_mutex *avmtx;
-
-    bool done;
-    SDL_mutex *donemtx;
-} thread_param_t;
-
-static thread_param_t thread_params;
-static SDL_Thread *fetch_thread = NULL;
-
-static void main_exit_handler() {
-    if (!fetch_thread) {
-        queue_fini(&frame_queue);
-        return;
-    }
-    SDL_LockMutex(thread_params.donemtx);
-    thread_params.done = true;
-    SDL_UnlockMutex(thread_params.donemtx);
-
-    int ret;
-    SDL_WaitThread(fetch_thread, &ret);
-    if (ret != 0) {
-        fprintf(stderr, "Inferior thread returned status %d\n", ret);
-    }
-    queue_fini(&frame_queue);
-    SDL_DestroyMutex(thread_params.avmtx);
-    SDL_DestroyMutex(thread_params.donemtx);
-}
-
-static int fetch_frames(void *ptr) {
-    thread_param_t *params = (thread_param_t *)ptr;
-    AVCodecContext *codec_ctx = params->video_ctx;
-    int stream_index = params->video_si;
-    int err;
-    bool lock_held = false;
-
-    for (;;) {
-        if (read_bool_with_lock(params->donemtx, &params->done)) {
-            err = 0;
-            goto finish;
-        }
-
-        assert(SDL_LockMutex(params->avmtx) == 0);
-        lock_held = true;
-        _cleanup_(av_frame_free) AVFrame *frame = av_frame_alloc();
-        if (!frame) {
-            fprintf(stderr, "Error allocating frame\n");
-            err = AVERROR(ENOMEM);
-            goto finish;
-        }
-        err = avcodec_receive_frame(codec_ctx, frame);
-        while (err == AVERROR(EAGAIN)) {
-            _cleanup_(av_packet_free) AVPacket *pkt = av_packet_alloc();
-            if (!pkt) {
-                fprintf(stderr, "Error allocating packet\n");
-                err = AVERROR(ENOMEM);
-                goto finish;
-            }
-            do {
-                err = av_read_frame(params->avctx, pkt);
-                if (err == AVERROR_EOF) {
-                    err = 0;
-                    goto finish;
-                }
-                else if (err < 0) {
-                    fprintf(stderr, "Error reading frame\n");
-                    goto finish;
-                }
-                codec_ctx =
-                    pkt->stream_index == params->video_si
-                    ? params->video_ctx
-                    : pkt->stream_index == params->audio_si
-                    ? params->audio_ctx
-                    : NULL;
-                stream_index = pkt->stream_index;
-            } while (!codec_ctx);
-            err = avcodec_send_packet(codec_ctx, pkt);
-            if (err < 0) {
-                fprintf(stderr, "Error sending packet to decoder\n");
-                goto finish;
-            }
-            err = avcodec_receive_frame(codec_ctx, frame);
-        }
-        if (err < 0) {
-            fprintf(stderr, "Error receiving frame from decoder\n");
-            goto finish;
-        }
-        assert(SDL_UnlockMutex(params->avmtx) == 0);
-        lock_held = false;
-
-        assert(SDL_LockMutex(frame_queue.mutex) == 0);
-        while (frame_queue.count == QUEUE_MAX) {
-            int ret;
-            do {
-                ret = SDL_CondWaitTimeout(frame_queue.empty,
-                        frame_queue.mutex, 40);
-                assert(ret >= 0);
-
-                if (read_bool_with_lock(params->donemtx,
-                            &params->done)) {
-                    set_bool_with_lock(params->donemtx, &params->done);
-                    assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
-                    return 0;
-                }
-            } while (ret == SDL_MUTEX_TIMEDOUT);
-        }
-        queue_enqueue(&frame_queue, (entry_t) {
-                .frame = TAKE_PTR(frame),
-                .stream_index = stream_index
-                });
-        assert(SDL_CondSignal(frame_queue.fill) == 0);
-        assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
-    }
-
-    err = 0;
-finish:
-    if (lock_held)
-        assert(SDL_UnlockMutex(params->avmtx) == 0);
-    set_bool_with_lock(params->donemtx, &params->done);
-    return err;
 }
 
 static void rescale_frame(App *app, AVFrame *frame) {
@@ -329,15 +209,8 @@ int main(int argc, char *argv[]) {
         .den = video_ctx->height
     };
 
-    SDL_mutex *avmtx = SDL_CreateMutex();
-    if (!avmtx) {
-        fprintf(stderr, "Error creating mutex\n");
-        exit(1);
-    }
-
     _cleanup_(app_fini) App app;
-    if (!app_init(&app, avctx, audio_ctx, video_ctx,
-                avmtx, &wanted_spec, &display_aspect)) {
+    if (!app_init(&app, &wanted_spec, &display_aspect)) {
         exit(1);
     }
 
@@ -346,13 +219,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    atexit(main_exit_handler);
-
-    SDL_mutex *donemtx = SDL_CreateMutex();
-    if (!donemtx) {
-        fprintf(stderr, "Error creating mutex\n");
-        exit(1);
-    }
+    SDL_mutex *seek_mtx = SDL_CreateMutex();
+    SDL_cond *seek_done = SDL_CreateCond();
 
     thread_params = (thread_param_t) {
         .avctx = avctx,
@@ -360,13 +228,21 @@ int main(int argc, char *argv[]) {
         .audio_si = audio_si,
         .video_ctx = video_ctx,
         .video_si = video_si,
-        .avmtx = avmtx,
+        .do_seek = false,
+        .seek_mtx = seek_mtx,
+        .seek_done = seek_done,
         .done = false,
-        .donemtx = donemtx
     };
 
+    atexit(main_exit_handler);
+
+    if (!seek_mtx || !seek_done) {
+        fprintf(stderr, "Error creating mutex/cond\n");
+        exit(1);
+    }
+
     fetch_thread = SDL_CreateThread(
-            fetch_frames, "fetch_thread", &thread_params);
+            fetch_frames, "fetch_thread", NULL);
     if (!fetch_thread) {
         fprintf(stderr, "Error launching inferior thread\n");
         exit(1);
@@ -387,18 +263,17 @@ int main(int argc, char *argv[]) {
             app.resized = false;
         }
         if (app.paused) {
-            SDL_Delay(16);
+            SDL_Delay(DEFAULT_FRAME_DELAY);
             continue;
         }
 
         assert(SDL_LockMutex(frame_queue.mutex) == 0);
         if (frame_queue.count == 0) {
             assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
-            SDL_Delay(16);
+            SDL_Delay(DEFAULT_FRAME_DELAY);
             continue;
             //assert(SDL_CondWait(frame_queue.fill, frame_queue.mutex) == 0);
         }
-
         _cleanup_(entry_freep) entry_t entry = queue_dequeue(&frame_queue);
         assert(SDL_CondSignal(frame_queue.empty) == 0);
         assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
@@ -429,5 +304,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    SDL_WaitThread(fetch_thread, NULL);
+    fetch_thread = NULL;
     return 0;
 }

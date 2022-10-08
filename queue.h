@@ -1,10 +1,11 @@
 #pragma once
-#include <SDL2/SDL.h>
 #include <stdbool.h>
 
 #define QUEUE_MAX 8
 
 typedef struct AVFrame AVFrame;
+typedef struct SDL_cond SDL_cond;
+typedef struct SDL_mutex SDL_mutex;
 
 typedef struct {
     AVFrame *frame;

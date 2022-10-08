@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEFAULT_FRAME_DELAY 16
+
 #define _unlikely_(x) __builtin_expect(!!(x), 0)
 #define _cleanup_(x) __attribute__((cleanup(x)))
 #define min(a, b)               \

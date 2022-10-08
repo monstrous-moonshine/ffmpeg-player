@@ -1,5 +1,5 @@
-#include <assert.h>
-#include <libavformat/avformat.h>
+#include <libavutil/frame.h>
+#include <SDL2/SDL.h>
 #include "queue.h"
 
 bool queue_init(Queue *queue) {
@@ -42,5 +42,4 @@ void queue_flush(Queue *queue) {
     }
     queue->use_ptr = queue->fill_ptr;
     queue->count = 0;
-    assert(SDL_CondSignal(queue->empty) == 0);
 }

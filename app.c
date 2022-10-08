@@ -1,9 +1,11 @@
 #include <assert.h>
+#include <libavformat/avformat.h>
+#include <SDL2/SDL.h>
 #include "app.h"
 #include "macro.h"
-#include "queue.h"
+#include "param.h"
 
-extern Queue frame_queue;
+extern thread_param_t thread_params;
 
 static void reset_viewport(App *app) {
     int viewport_width, viewport_height;
@@ -24,16 +26,8 @@ static void reset_viewport(App *app) {
 }
 
 bool app_init(App *app,
-        AVFormatContext *avctx,
-        AVCodecContext *audioctx,
-        AVCodecContext *videoctx,
-        SDL_mutex *avmtx,
         SDL_AudioSpec *wanted_spec,
         Rational *display_aspect) {
-    app->avctx = avctx;
-    app->audioctx = audioctx;
-    app->videoctx = videoctx;
-    app->avmtx = avmtx;
     app->t_start = -1;
     app->pts = 0;
     app->paused = false;
@@ -114,24 +108,16 @@ void app_fini(App *app) {
 }
 
 static void seek(App *app, int delta) {
-    int flags = 0;
-    if (delta < 0)
-        flags |= AVSEEK_FLAG_BACKWARD;
+    thread_params.seek_flags = delta < 0 ? AVSEEK_FLAG_BACKWARD : 0;
+    thread_params.seek_pts = app->pts + delta;
 
-    assert(SDL_LockMutex(app->avmtx) == 0);
-    if (av_seek_frame(app->avctx, -1, (app->pts + delta) * 1000, flags) < 0) {
-        fprintf(stderr, "Error seeking to frame\n");
-        assert(SDL_UnlockMutex(app->avmtx) == 0);
-        return;
+    assert(SDL_LockMutex(thread_params.seek_mtx) == 0);
+    thread_params.do_seek = true;
+    while (thread_params.do_seek) {
+        assert(SDL_CondWait(thread_params.seek_done,
+                    thread_params.seek_mtx) == 0);
     }
-    avformat_flush(app->avctx);
-    avcodec_flush_buffers(app->audioctx);
-    avcodec_flush_buffers(app->videoctx);
-    assert(SDL_UnlockMutex(app->avmtx) == 0);
-
-    assert(SDL_LockMutex(frame_queue.mutex) == 0);
-    queue_flush(&frame_queue);
-    assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
+    assert(SDL_UnlockMutex(thread_params.seek_mtx) == 0);
 
     SDL_ClearQueuedAudio(app->audio_devID);
     app->t_start = -1;
@@ -154,11 +140,16 @@ void process_events(App *app) {
         switch (e.type) {
         case SDL_QUIT:
             app->done = true;
+            thread_params.done = true;
             break;
         case SDL_KEYDOWN:
             switch (e.key.keysym.sym) {
             case SDLK_q:
                 app->done = true;
+                thread_params.done = true;
+                break;
+            case SDLK_SPACE:
+                toggle_pause(app);
                 break;
             case SDLK_RIGHT:
                 seek(app, 10000);
@@ -171,9 +162,6 @@ void process_events(App *app) {
                 break;
             case SDLK_DOWN:
                 seek(app, -60000);
-                break;
-            case SDLK_SPACE:
-                toggle_pause(app);
                 break;
             }
             break;
