@@ -10,76 +10,30 @@
 #include "param.h"
 #include "queue.h"
 
-Queue frame_queue;
-thread_param_t thread_params;
+Queue video_queue;
+Queue audio_queue;
+thread_param_t avparam;
 static SDL_Thread *fetch_thread = NULL;
 
-static inline void avctx_freep(AVFormatContext **pformat_ctx) {
-    avformat_close_input(pformat_ctx);
-    avformat_free_context(*pformat_ctx);
-}
-
-static inline void sws_freectxp(struct SwsContext **pctx) {
+static void sws_freectxp(struct SwsContext **pctx) {
     sws_freeContext(*pctx);
-}
-
-static inline void entry_freep(entry_t *entry) {
-    av_frame_free(&entry->frame);
-}
-
-static inline const char *my_avstrerror(int err) {
-    static char buffer[AV_ERROR_MAX_STRING_SIZE];
-    av_strerror(err, buffer, AV_ERROR_MAX_STRING_SIZE);
-    return buffer;
 }
 
 static void main_exit_handler() {
     if (fetch_thread) {
-        thread_params.done = true;
+        avparam.done = true;
         SDL_WaitThread(fetch_thread, NULL);
         /* fetch_thread = NULL; */
     }
 
-    queue_fini(&frame_queue);
-
-    if (thread_params.seek_mtx)
-        SDL_DestroyMutex(thread_params.seek_mtx);
-    if (thread_params.seek_done)
-        SDL_DestroyCond(thread_params.seek_done);
-}
-
-static AVCodecContext *get_codec_context(
-        AVFormatContext *avctx, int stream_index) {
-    AVCodecParameters *codec_param;
-    const AVCodec *codec;
-    AVCodecContext *codec_ctx;
-
-    codec_param = avctx->streams[stream_index]->codecpar;
-    codec = avcodec_find_decoder(codec_param->codec_id);
-    if (!codec) {
-        const char *name = avcodec_get_name(codec_param->codec_id);
-        fprintf(stderr, "Failed to find decoder: %s\n", name);
-        exit(1);
-    }
-    codec_ctx = avcodec_alloc_context3(codec);
-    if (!codec_ctx) {
-        fprintf(stderr, "Error allocating codec context\n");
-        exit(1);
-    }
-    if (avcodec_parameters_to_context(codec_ctx, codec_param) < 0) {
-        fprintf(stderr, "Error initializing codec context\n");
-        exit(1);
-    }
-    if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
-        fprintf(stderr, "Error opening codec context\n");
-        exit(1);
-    }
-    return codec_ctx;
+    avparam_fini(&avparam);
+    queue_fini(&video_queue);
+    queue_fini(&audio_queue);
 }
 
 static void rescale_frame(App *app, AVFrame *frame) {
-    _cleanup_(sws_freectxp)
-    struct SwsContext *sws_ctx = sws_getContext(
+    _cleanup_(sws_freectxp) struct SwsContext *sws_ctx = NULL;
+    sws_ctx = sws_getContext(
             frame->width, frame->height, frame->format,
             app->viewport.w, app->viewport.h, AV_PIX_FMT_RGBA,
             SWS_BILINEAR, NULL, NULL, NULL);
@@ -89,7 +43,7 @@ static void rescale_frame(App *app, AVFrame *frame) {
     }
 
     uint8_t *pixels[1];
-    int pitch[1];
+    int      pitch [1];
     assert(SDL_LockTexture(app->tex, &app->viewport,
                 (void **)pixels, pitch) == 0);
     int ret = sws_scale(
@@ -102,7 +56,7 @@ static void rescale_frame(App *app, AVFrame *frame) {
     SDL_UnlockTexture(app->tex);
 }
 
-static AVFrame *resample_frame(App *app, AVFrame *frame) {
+static AVFrame *resample_frame(SDL_AudioSpec *spec, AVFrame *frame) {
     int err;
 
     _cleanup_(av_frame_free) AVFrame *resampled = av_frame_alloc();
@@ -119,7 +73,7 @@ static AVFrame *resample_frame(App *app, AVFrame *frame) {
 #else
     resampled->ch_layout = (AVChannelLayout) AV_CHANNEL_LAYOUT_STEREO;
 #endif
-    resampled->sample_rate = app->audio_spec.freq;
+    resampled->sample_rate = spec->freq;
     resampled->format = AV_SAMPLE_FMT_FLT;
     _cleanup_(swr_free) SwrContext *swr = NULL;
     err = swr_alloc_set_opts2(&swr,
@@ -156,96 +110,113 @@ static void update_frame(App *app) {
     SDL_RenderPresent(app->ren);
 }
 
+static void audio_callback(void *ptr, uint8_t *stream, int len) {
+    App *app = (App *)ptr;
+    static uint8_t buffer[MAX_BUFFER_SIZE];
+    static int buf_idx = 0;
+    static int buf_size = 0;
+
+    int out_idx = 0;
+    if (buf_idx < buf_size) {
+        int buf_len = buf_size - buf_idx;
+        int nwrite = min(len, buf_len);
+        memcpy(stream, &buffer[buf_idx], nwrite);
+        buf_idx += nwrite;
+        if (buf_idx == buf_size) {
+            buf_idx = 0;
+            buf_size = 0;
+        }
+        len -= nwrite;
+        out_idx += nwrite;
+    }
+
+    while (len > 0) {
+        assert(SDL_LockMutex(audio_queue.mutex) == 0);
+        if (audio_queue.count == 0) {
+            assert(SDL_UnlockMutex(audio_queue.mutex) == 0);
+            memset(&stream[out_idx], 0, len);
+            return;
+        }
+        _cleanup_(av_frame_free)
+        AVFrame *frame = queue_dequeue(&audio_queue);
+        assert(SDL_CondSignal(audio_queue.empty) == 0);
+        assert(SDL_UnlockMutex(audio_queue.mutex) == 0);
+
+        _cleanup_(av_frame_free)
+        AVFrame *resampled = resample_frame(&app->audio_spec, frame);
+        int sample_size = av_get_bytes_per_sample(resampled->format);
+        int datasize = resampled->ch_layout.nb_channels *
+            resampled->nb_samples * sample_size;
+        float volume = app->muted ? 0 : app->volume;
+        for (int i = 0; i < datasize / sample_size; i++) {
+            ((float*)resampled->data[0])[i] *= volume;
+        }
+        int nwrite = min(len, datasize);
+        memcpy(&stream[out_idx], resampled->data[0], nwrite);
+        len -= nwrite;
+        out_idx += nwrite;
+        if (nwrite < datasize) {
+            memcpy(buffer, &resampled->data[0][nwrite], datasize - nwrite);
+            buf_size = datasize - nwrite;
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
-    int err;
+    _cleanup_(app_fini) App app = {};
+    avparam = (thread_param_t) {};
+    video_queue = (Queue) {};
+    audio_queue = (Queue) {};
 
     if (argc < 2) {
         fprintf(stderr, "Usage: %s input_file\n", argv[0]);
         exit(1);
     }
 
-    _cleanup_(avctx_freep) AVFormatContext *avctx = NULL;
-    const char *url = argv[1];
-    err = avformat_open_input(&avctx, url, NULL, NULL);
-    if (err < 0) {
-        fprintf(stderr, "Error opening file '%s': %s\n", url, 
-                my_avstrerror(err));
-        exit(1);
-    }
-    if (avformat_find_stream_info(avctx, NULL) < 0) {
-        fprintf(stderr, "Error getting stream information\n");
-        exit(1);
-    }
-    // av_dump_format(avctx, 0, argv[1], 0);
-
-    int video_si = -1; // video stream index
-    int audio_si = -1; // audio stream index
-    video_si = av_find_best_stream(
-            avctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
-    audio_si = av_find_best_stream(
-            avctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
-    if (video_si < 0 || audio_si < 0) {
-        fprintf(stderr, "No audio/video stream available\n");
-        exit(1);
-    }
-
-    _cleanup_(avcodec_free_context)
-    AVCodecContext *video_ctx = get_codec_context(avctx, video_si);
-    _cleanup_(avcodec_free_context)
-    AVCodecContext *audio_ctx = get_codec_context(avctx, audio_si);
-
-    SDL_AudioSpec wanted_spec = {
-#ifdef KEEP_CHANNEL_LAYOUT
-        .channels = audio_ctx->ch_layout.nb_channels;
-#else
-        .channels = 2,
-#endif
-        .format   = AUDIO_F32,
-        .freq     = audio_ctx->sample_rate,
-        .samples  = 1024,
-    };
-
-    Rational display_aspect = {
-        .num = video_ctx->width,
-        .den = video_ctx->height
-    };
-
-    _cleanup_(app_fini) App app;
-    if (!app_init(&app, &wanted_spec, &display_aspect)) {
-        exit(1);
-    }
-
-    if (!queue_init(&frame_queue)) {
-        fprintf(stderr, "Error initializing frame queue\n");
-        exit(1);
-    }
-
-    SDL_mutex *seek_mtx = SDL_CreateMutex();
-    SDL_cond *seek_done = SDL_CreateCond();
-
-    thread_params = (thread_param_t) {
-        .avctx = avctx,
-        .audio_ctx = audio_ctx,
-        .audio_si = audio_si,
-        .video_ctx = video_ctx,
-        .video_si = video_si,
-        .do_seek = false,
-        .seek_mtx = seek_mtx,
-        .seek_done = seek_done,
-        .done = false,
-    };
-
     atexit(main_exit_handler);
 
-    if (!seek_mtx || !seek_done) {
-        fprintf(stderr, "Error creating mutex/cond\n");
+    if (!avparam_init(&avparam, argv[1]))
+        exit(1);
+
+    if (!queue_init(&video_queue
+#ifdef QUEUE_LOG_COUNT
+                , "queue_log_count_video"
+#endif
+                ) || !queue_init(&audio_queue
+#ifdef QUEUE_LOG_COUNT
+                    , "queue_log_count_audio"
+#endif
+                    )) {
+        LOG_ERROR("Error initializing frame queue\n");
         exit(1);
     }
 
     fetch_thread = SDL_CreateThread(
             fetch_frames, "fetch_thread", NULL);
     if (!fetch_thread) {
-        fprintf(stderr, "Error launching inferior thread\n");
+        LOG_ERROR("Error launching inferior thread\n");
+        exit(1);
+    }
+
+    SDL_AudioSpec wanted_spec = {
+        .callback = audio_callback,
+#ifdef KEEP_CHANNEL_LAYOUT
+        .channels = avparam.audio_ctx->ch_layout.nb_channels;
+#else
+        .channels = 2,
+#endif
+        .format   = AUDIO_F32,
+        .freq     = avparam.audio_ctx->sample_rate,
+        .samples  = 1024,
+        .userdata = &app,
+    };
+
+    Rational display_aspect = {
+        .num = avparam.video_ctx->width,
+        .den = avparam.video_ctx->height
+    };
+
+    if (!app_init(&app, &wanted_spec, &display_aspect)) {
         exit(1);
     }
 
@@ -268,48 +239,30 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        assert(SDL_LockMutex(frame_queue.mutex) == 0);
-        if (frame_queue.count == 0) {
-            assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
+        assert(SDL_LockMutex(video_queue.mutex) == 0);
+        if (video_queue.count == 0) {
+            assert(SDL_UnlockMutex(video_queue.mutex) == 0);
             SDL_Delay(DEFAULT_FRAME_DELAY);
             continue;
-            //assert(SDL_CondWait(frame_queue.fill, frame_queue.mutex) == 0);
         }
-        _cleanup_(entry_freep) entry_t entry = queue_dequeue(&frame_queue);
-        assert(SDL_CondSignal(frame_queue.empty) == 0);
-        assert(SDL_UnlockMutex(frame_queue.mutex) == 0);
+        _cleanup_(av_frame_free) AVFrame *frame = queue_dequeue(&video_queue);
+        assert(SDL_CondSignal(video_queue.empty) == 0);
+        assert(SDL_UnlockMutex(video_queue.mutex) == 0);
 
-        if (entry.stream_index == video_si) {
-            rescale_frame(&app, entry.frame);
+        rescale_frame(&app, frame);
 
-            int64_t pts = entry.frame->best_effort_timestamp;
-            if (app.t_start == -1) {
-                app.t_start = SDL_GetTicks64() - pts;
-            }
-            app.pts = pts;
-
-            int64_t t_elapsed = SDL_GetTicks64() - app.t_start;
-            uint32_t delay = max(pts - t_elapsed, 0);
-            SDL_Delay(delay);
-
-            update_frame(&app);
-        } else {
-            _cleanup_(av_frame_free) AVFrame *resampled;
-            resampled = resample_frame(&app, entry.frame);
-            int sample_size = av_get_bytes_per_sample(resampled->format);
-            int datasize = resampled->ch_layout.nb_channels *
-                resampled->nb_samples * sample_size;
-            float volume = app.muted ? 0 : app.volume;
-            for (int i = 0; i < datasize / sample_size; i++) {
-                ((float*)resampled->data[0])[i] *= volume;
-            }
-            assert(SDL_QueueAudio(app.audio_devID, resampled->data[0],
-                        datasize) == 0);
-            SDL_PauseAudioDevice(app.audio_devID, 0);
+        long pts = frame->best_effort_timestamp;
+        if (app.t_start == -1) {
+            app.t_start = SDL_GetTicks64() - pts;
         }
+        app.pts = pts;
+
+        long t_elapsed = SDL_GetTicks64() - app.t_start;
+        unsigned delay = max(pts - t_elapsed, 0);
+        SDL_Delay(delay);
+
+        update_frame(&app);
     }
 
-    SDL_WaitThread(fetch_thread, NULL);
-    fetch_thread = NULL;
     return 0;
 }

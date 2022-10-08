@@ -1,6 +1,7 @@
 #pragma once
 
 #define DEFAULT_FRAME_DELAY 16
+#define MAX_BUFFER_SIZE (32 * 1024)
 
 #define _unlikely_(x) __builtin_expect(!!(x), 0)
 #define _cleanup_(x) __attribute__((cleanup(x)))
@@ -22,4 +23,12 @@
         __typeof__(ptr) _ptr_ = *_pptr_;  \
         *_pptr_ = NULL;                   \
         _ptr_;                            \
+    })
+#define LOG_ERROR(fmt, ...) \
+    ({ \
+        fprintf(stderr, "\\[\e[31m\\]"); \
+        fprintf(stderr, "%s:%d:%s: ", __FILE__, __LINE__, __FUNCTION__); \
+        fprintf(stderr, fmt, ## __VA_ARGS__); \
+        fprintf(stderr, "\\[\e[0m\\]"); \
+        (void)0; \
     })

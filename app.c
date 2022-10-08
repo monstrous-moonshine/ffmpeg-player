@@ -5,7 +5,7 @@
 #include "macro.h"
 #include "param.h"
 
-extern thread_param_t thread_params;
+extern thread_param_t avparam;
 
 static void reset_viewport(App *app) {
     int viewport_width, viewport_height;
@@ -29,22 +29,13 @@ bool app_init(App *app,
         SDL_AudioSpec *wanted_spec,
         Rational *display_aspect) {
     app->t_start = -1;
-    app->pts = 0;
-    app->paused = false;
 
-    app->win = NULL;
-    app->ren = NULL;
-    app->tex = NULL;
     app->display_aspect.num = display_aspect->num;
     app->display_aspect.den = display_aspect->den;
 
     app->volume = 1.0;
-    app->muted = false;
-
     app->width = 640;
     app->height = 480;
-    app->resized = false;
-    app->done = false;
 
     reset_viewport(app);
 
@@ -113,16 +104,16 @@ void app_fini(App *app) {
 }
 
 static void seek(App *app, int delta) {
-    thread_params.seek_flags = delta < 0 ? AVSEEK_FLAG_BACKWARD : 0;
-    thread_params.seek_pts = app->pts + delta;
+    avparam.seek_flags = delta < 0 ? AVSEEK_FLAG_BACKWARD : 0;
+    avparam.seek_pts = app->pts + delta;
 
-    assert(SDL_LockMutex(thread_params.seek_mtx) == 0);
-    thread_params.do_seek = true;
-    while (thread_params.do_seek) {
-        assert(SDL_CondWait(thread_params.seek_done,
-                    thread_params.seek_mtx) == 0);
+    assert(SDL_LockMutex(avparam.seek_mtx) == 0);
+    avparam.do_seek = true;
+    while (avparam.do_seek) {
+        assert(SDL_CondWait(avparam.seek_done,
+                    avparam.seek_mtx) == 0);
     }
-    assert(SDL_UnlockMutex(thread_params.seek_mtx) == 0);
+    assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
 
     SDL_ClearQueuedAudio(app->audio_devID);
     app->t_start = -1;
@@ -145,13 +136,13 @@ void process_events(App *app) {
         switch (e.type) {
         case SDL_QUIT:
             app->done = true;
-            thread_params.done = true;
+            avparam.done = true;
             break;
         case SDL_KEYDOWN:
             switch (e.key.keysym.sym) {
             case SDLK_q:
                 app->done = true;
-                thread_params.done = true;
+                avparam.done = true;
                 break;
             case SDLK_SPACE:
                 toggle_pause(app);

@@ -1,6 +1,5 @@
 #pragma once
 #include <SDL2/SDL.h>
-#include <stdint.h>
 #include <stdbool.h>
 
 typedef struct {
@@ -9,15 +8,19 @@ typedef struct {
 } Rational;
 
 typedef struct {
-    int64_t t_start;
-    int64_t pts;
-    bool paused;
+    long t_start; // used for video sync
+    long pts;     // used for pause and sync
+    bool paused;  // used for pause, obviously
 
     SDL_AudioDeviceID audio_devID;
     SDL_AudioSpec audio_spec;
     SDL_Window *win;
     SDL_Renderer *ren;
     SDL_Texture *tex;
+
+    // these two fields are used to display to a
+    // subregion of correct aspect ratio for any
+    // given window size
     Rational display_aspect;
     SDL_Rect viewport;
 
