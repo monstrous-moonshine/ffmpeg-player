@@ -5,7 +5,8 @@
 /* queue size must be big enough that the audio
  * queue doesn't clog up and keep the video from
  * coming */
-#define QUEUE_MAX 16
+#define QUEUE_MAX 32
+#define QUEUE_LOG_COUNT
 
 typedef struct AVFrame AVFrame;
 typedef struct SDL_cond SDL_cond;
