@@ -39,15 +39,6 @@ static bool get_codec_context(AVFormatContext *avctx,
     return true;
 }
 
-static void dump_stream(AVStream *stream) {
-    AVRational time_base = stream->time_base;
-    double time_base_f = time_base.num / (double)time_base.den;
-    printf("Timebase: %d/%d\n", stream->time_base.num, stream->time_base.den);
-    printf("Start time: %ld\n", stream->start_time);
-    printf("Duration: %.2f\n", stream->duration * time_base_f);
-    printf("Number of frames: %ld\n", stream->nb_frames);
-}
-
 bool avparam_init(avparam_t *param, const char *url) {
     int err;
     bool ret;
@@ -73,8 +64,6 @@ bool avparam_init(avparam_t *param, const char *url) {
         LOG_ERROR("No audio/video stream available\n");
         return false;
     }
-    dump_stream(param->avctx->streams[param->video_si]);
-    dump_stream(param->avctx->streams[param->audio_si]);
 
     ret = get_codec_context(param->avctx,
             param->video_si, &param->video_ctx);
