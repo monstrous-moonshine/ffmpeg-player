@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include "macro.h"
 #include "param.h"
-#include "util.h"
 
 static bool get_codec_context(AVFormatContext *avctx,
         int stream_index, AVCodecContext **out) {
@@ -27,12 +26,12 @@ static bool get_codec_context(AVFormatContext *avctx,
     }
     err = avcodec_parameters_to_context(codec_ctx, codec_param);
     if (err < 0) {
-        LOG_ERROR("Error copying codec context: %s\n", my_avstrerror(err));
+        LOG_ERROR("Error copying codec context: %s\n", av_err2str(err));
         return false;
     }
     err = avcodec_open2(codec_ctx, codec, NULL);
     if (err < 0) {
-        LOG_ERROR("Error opening codec context: %s\n", my_avstrerror(err));
+        LOG_ERROR("Error opening codec context: %s\n", av_err2str(err));
         return false;
     }
     *out = codec_ctx;
@@ -46,12 +45,12 @@ bool avparam_init(avparam_t *param, const char *url) {
     err = avformat_open_input(&param->avctx, url, NULL, NULL);
     if (err < 0) {
         fprintf(stderr, "Error opening file '%s': %s\n", url,
-                my_avstrerror(err));
+                av_err2str(err));
         return false;
     }
     err = avformat_find_stream_info(param->avctx, NULL);
     if (err < 0) {
-        LOG_ERROR("Error getting stream info: %s\n", my_avstrerror(err));
+        LOG_ERROR("Error getting stream info: %s\n", av_err2str(err));
         return false;
     }
     // av_dump_format(param->avctx, 0, url, 0);

@@ -6,7 +6,6 @@
 #include "macro.h"
 #include "param.h"
 #include "queue.h"
-#include "util.h"
 
 /* DONE: add av_strerror() strings to error messages */
 
@@ -24,7 +23,7 @@ static void seek() {
             avparam.seek_flags);
     if (err < 0) {
         LOG_ERROR("Error seeking to frame: %s\n",
-                my_avstrerror(err));
+                av_err2str(err));
         return;
     }
     /* avformat_flush(thread_params.avctx); */
@@ -54,7 +53,7 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
                 return err;
             } else if (err < 0) {
                 LOG_ERROR("Error reading frame: %s\n",
-                        my_avstrerror(err));
+                        av_err2str(err));
                 return err;
             }
             *pcodec_ctx =
@@ -69,7 +68,7 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
         err = avcodec_send_packet(*pcodec_ctx, pkt);
         if (err < 0) {
             LOG_ERROR("Error sending packet to decoder: %s\n",
-                    my_avstrerror(err));
+                    av_err2str(err));
             return err;
         }
 
@@ -77,7 +76,7 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
     }
     if (err < 0) {
         LOG_ERROR("Error receiving frame from decoder: %s\n",
-                my_avstrerror(err));
+                av_err2str(err));
         return err;
     }
 
