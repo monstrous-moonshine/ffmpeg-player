@@ -10,6 +10,7 @@
 #include <string.h>
 #include "app.h"
 #include "decode.h"
+#include "draw.h"
 #include "macro.h"
 #include "param.h"
 #include "queue.h"
@@ -272,22 +273,7 @@ int main(int argc, char *argv[]) {
 
         update_frame(&app);
 #ifdef PLAYER_DISP_MVS
-        AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
-        if (side_data) {
-            AVMotionVector *motion_vec = (AVMotionVector *)side_data->data;
-            int nb_motion_vec = side_data->size / sizeof *motion_vec;
-            for (int i = 0; i < nb_motion_vec; i++) {
-                SDL_Rect rect = {
-                    .x = motion_vec->dst_x,
-                    .y = motion_vec->dst_y,
-                    .w = motion_vec->w,
-                    .h = motion_vec->h,
-                };
-                assert(SDL_SetRenderDrawColor(app.ren,
-                            0xff, 0xff, 0xff, 0xff) == 0);
-                (void)SDL_RenderDrawRect(app.ren, &rect);
-            }
-        }
+        draw_motion_vectors(frame, app.ren, &app.viewport);
 #endif
         SDL_RenderPresent(app.ren);
     }

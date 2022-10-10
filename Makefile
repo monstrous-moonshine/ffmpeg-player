@@ -6,9 +6,9 @@ ifeq ($(BUILD),debug)
 else
     CFLAGS += -02 -DNDEBUG
 endif
-LDLIBS = -lSDL2 -lavformat -lavcodec -lswresample -lswscale -lavutil
+LDLIBS = -lSDL2 -lavformat -lavcodec -lswresample -lswscale -lavutil -lm
 
-SRCS = app.c decode.c param.c player.c queue.c
+SRCS = app.c draw.c decode.c param.c player.c queue.c
 OBJS = $(SRCS:%.c=build/%.o)
 DEPS = $(OBJS:.o=.d)
 
