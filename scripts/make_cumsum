@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+import sys
+import numpy as np
+
+data = np.array([int(s) for s in sys.stdin])
+target = int(sys.argv[1])
+out = np.cumsum(data == target)
+for v in out:
+    print(v)

@@ -8,7 +8,8 @@ typedef struct {
     AVFormatContext *avctx;
     AVCodecContext *video_ctx;
     AVCodecContext *audio_ctx;
-    int video_si, audio_si;
+    AVCodecContext *subcc_ctx;
+    int video_si, audio_si, subcc_si;
 
     SDL_mutex *seek_mtx;
     SDL_cond  *seek_done;

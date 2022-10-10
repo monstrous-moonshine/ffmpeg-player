@@ -59,6 +59,8 @@ bool avparam_init(avparam_t *param, const char *url) {
             param->avctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
     param->audio_si = av_find_best_stream(
             param->avctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+    param->subcc_si = av_find_best_stream(
+            param->avctx, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
     if (param->video_si < 0 || param->audio_si < 0) {
         LOG_ERROR("No audio/video stream available\n");
         return false;
