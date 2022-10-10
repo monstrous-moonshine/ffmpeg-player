@@ -4,6 +4,8 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 
+#define PLAYER_DISP_MVS
+
 typedef struct {
     AVFormatContext *avctx;
     AVCodecContext *video_ctx;

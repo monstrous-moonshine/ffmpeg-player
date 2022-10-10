@@ -1,8 +1,9 @@
 #include <assert.h>
 #include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
+#include <libavutil/avutil.h>
+#include <libavutil/motion_vector.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -253,6 +254,16 @@ int main(int argc, char *argv[]) {
         assert(SDL_CondSignal(video_queue.empty) == 0);
         assert(SDL_UnlockMutex(video_queue.mutex) == 0);
 
+#ifdef PLAYER_DISP_MVS
+        int nb_mvec = 0;
+        for (int i = 0; i < frame->nb_side_data; i++) {
+            if (frame->side_data[i]->type == AV_FRAME_DATA_MOTION_VECTORS) {
+                nb_mvec++;
+                AVMotionVector *mvec = (AVMotionVector *)frame->side_data[i]->data;
+                (void)mvec;
+            }
+        }
+#endif
         rescale_frame(&app, frame);
 
         long pts = frame->best_effort_timestamp;

@@ -34,6 +34,9 @@ static bool get_codec_context(AVFormatContext *avctx,
         LOG_ERROR("Error opening codec context: %s\n", av_err2str(err));
         return false;
     }
+#ifdef PLAYER_DISP_MVS
+    codec_ctx->flags2 |= AV_CODEC_EXPORT_DATA_MVS;
+#endif
     *out = codec_ctx;
     return true;
 }
