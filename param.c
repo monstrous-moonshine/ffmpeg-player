@@ -35,7 +35,7 @@ static bool get_codec_context(AVFormatContext *avctx,
         return false;
     }
 #ifdef PLAYER_DISP_MVS
-    codec_ctx->flags2 |= AV_CODEC_EXPORT_DATA_MVS;
+    codec_ctx->export_side_data |= AV_CODEC_EXPORT_DATA_MVS;
 #endif
     *out = codec_ctx;
     return true;

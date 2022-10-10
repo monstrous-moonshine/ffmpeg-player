@@ -119,7 +119,6 @@ static void update_frame(App *app) {
                 app->ren, 0x00, 0x2b, 0x36, 0xff) == 0);
     assert(SDL_RenderClear(app->ren) == 0);
     assert(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
-    SDL_RenderPresent(app->ren);
 }
 
 static void audio_callback(void *ptr, uint8_t *stream, int len) {
@@ -216,9 +215,15 @@ int main(int argc, char *argv[]) {
         .userdata = &app,
     };
 
-    Rational display_aspect = {
+    AVRational sample_aspect = avparam.video_ctx->sample_aspect_ratio;
+    AVRational display_res = {
         .num = avparam.video_ctx->width,
-        .den = avparam.video_ctx->height
+        .den = avparam.video_ctx->height,
+    };
+    AVRational display_aspect_av = av_mul_q(sample_aspect, display_res);
+    Rational display_aspect = {
+        .num = display_aspect_av.num,
+        .den = display_aspect_av.den,
     };
 
     if (!app_init(&app, &wanted_spec, &display_aspect)) {
@@ -253,17 +258,6 @@ int main(int argc, char *argv[]) {
         _cleanup_(av_frame_free) AVFrame *frame = queue_dequeue(&video_queue);
         assert(SDL_CondSignal(video_queue.empty) == 0);
         assert(SDL_UnlockMutex(video_queue.mutex) == 0);
-
-#ifdef PLAYER_DISP_MVS
-        int nb_mvec = 0;
-        for (int i = 0; i < frame->nb_side_data; i++) {
-            if (frame->side_data[i]->type == AV_FRAME_DATA_MOTION_VECTORS) {
-                nb_mvec++;
-                AVMotionVector *mvec = (AVMotionVector *)frame->side_data[i]->data;
-                (void)mvec;
-            }
-        }
-#endif
         rescale_frame(&app, frame);
 
         long pts = frame->best_effort_timestamp;
@@ -277,6 +271,25 @@ int main(int argc, char *argv[]) {
         SDL_Delay(delay);
 
         update_frame(&app);
+#ifdef PLAYER_DISP_MVS
+        AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
+        if (side_data) {
+            AVMotionVector *motion_vec = (AVMotionVector *)side_data->data;
+            int nb_motion_vec = side_data->size / sizeof *motion_vec;
+            for (int i = 0; i < nb_motion_vec; i++) {
+                SDL_Rect rect = {
+                    .x = motion_vec->dst_x,
+                    .y = motion_vec->dst_y,
+                    .w = motion_vec->w,
+                    .h = motion_vec->h,
+                };
+                assert(SDL_SetRenderDrawColor(app.ren,
+                            0xff, 0xff, 0xff, 0xff) == 0);
+                (void)SDL_RenderDrawRect(app.ren, &rect);
+            }
+        }
+#endif
+        SDL_RenderPresent(app.ren);
     }
 
     return 0;
