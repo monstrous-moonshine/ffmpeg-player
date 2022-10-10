@@ -115,13 +115,6 @@ static AVFrame *resample_frame(SDL_AudioSpec *spec, AVFrame *frame) {
     return TAKE_PTR(resampled);
 }
 
-static void update_frame(App *app) {
-    assert(SDL_SetRenderDrawColor(
-                app->ren, 0x00, 0x2b, 0x36, 0xff) == 0);
-    assert(SDL_RenderClear(app->ren) == 0);
-    assert(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
-}
-
 static void audio_callback(void *ptr, uint8_t *stream, int len) {
     App *app = (App *)ptr;
     static uint8_t buffer[MAX_BUFFER_SIZE];
@@ -174,7 +167,19 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
     }
 }
 
+static void update_frame(App *app) {
+    assert(SDL_SetRenderDrawColor(
+                app->ren, 0x00, 0x2b, 0x36, 0xff) == 0);
+    assert(SDL_RenderClear(app->ren) == 0);
+    assert(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
+}
+
+static void render_frame(App *app) {
+    SDL_RenderPresent(app->ren);
+}
+
 int main(int argc, char *argv[]) {
+    _cleanup_(av_frame_free) AVFrame *frame = NULL;
     _cleanup_(app_fini) App app = {};
     avparam = (avparam_t) {};
     video_queue = (Queue) {};
@@ -247,16 +252,17 @@ int main(int argc, char *argv[]) {
         }
         if (app.paused) {
             SDL_Delay(DEFAULT_FRAME_DELAY);
-            continue;
+            goto do_render;
         }
 
         assert(SDL_LockMutex(video_queue.mutex) == 0);
         if (video_queue.count == 0) {
             assert(SDL_UnlockMutex(video_queue.mutex) == 0);
             SDL_Delay(DEFAULT_FRAME_DELAY);
-            continue;
+            goto do_render;
         }
-        _cleanup_(av_frame_free) AVFrame *frame = queue_dequeue(&video_queue);
+        av_frame_free(&frame);
+        frame = queue_dequeue(&video_queue);
         assert(SDL_CondSignal(video_queue.empty) == 0);
         assert(SDL_UnlockMutex(video_queue.mutex) == 0);
         rescale_frame(&app, frame);
@@ -271,11 +277,12 @@ int main(int argc, char *argv[]) {
         unsigned delay = max(pts - t_elapsed, 0);
         SDL_Delay(delay);
 
+do_render:
         update_frame(&app);
 #ifdef PLAYER_DISP_MVS
         draw_motion_vectors(frame, app.ren, &app.viewport);
 #endif
-        SDL_RenderPresent(app.ren);
+        render_frame(&app);
     }
 
     return 0;
