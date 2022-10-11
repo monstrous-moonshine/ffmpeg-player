@@ -10,8 +10,8 @@ typedef struct {
     AVFormatContext *avctx;
     AVCodecContext *video_ctx;
     AVCodecContext *audio_ctx;
-    AVCodecContext *subcc_ctx;
-    int video_si, audio_si, subcc_si;
+    AVCodecContext *sub_ctx;
+    int video_si, audio_si, sub_si;
 
     SDL_mutex *seek_mtx;
     SDL_cond  *seek_done;

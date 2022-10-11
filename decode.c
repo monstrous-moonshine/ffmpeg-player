@@ -14,7 +14,7 @@ extern avparam_t avparam;
 extern Queue video_queue;
 extern Queue audio_queue;
 
-static void unlockp(SDL_mutex **pmtx) {
+static inline void unlockp(SDL_mutex **pmtx) {
     ASSERT(SDL_UnlockMutex(*pmtx) == 0);
 }
 
@@ -33,7 +33,6 @@ static void seek() {
 
     queue_flush(&video_queue);
     queue_flush(&audio_queue);
-
 }
 
 static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,

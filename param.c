@@ -63,7 +63,7 @@ bool avparam_init(avparam_t *param, const char *url) {
             param->avctx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
     param->audio_si = av_find_best_stream(
             param->avctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
-    param->subcc_si = av_find_best_stream(
+    param->sub_si = av_find_best_stream(
             param->avctx, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
     if (param->video_si < 0 || param->audio_si < 0) {
         LOG_ERROR("No audio/video stream available\n");
@@ -76,6 +76,11 @@ bool avparam_init(avparam_t *param, const char *url) {
     ret = get_codec_context(param->avctx,
             param->audio_si, &param->audio_ctx);
     if (!ret) return false;
+    if (param->sub_si >= 0) {
+        ret = get_codec_context(param->avctx,
+                param->sub_si, &param->sub_ctx);
+        if (!ret) return false;
+    }
 
     param->seek_mtx = SDL_CreateMutex();
     param->seek_done = SDL_CreateCond();
