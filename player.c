@@ -3,13 +3,17 @@
 #include <libswscale/swscale.h>
 #include <libavutil/avutil.h>
 #include <SDL2/SDL.h>
+#ifndef NDEBUG
 #include <assert.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
 #include "decode.h"
+#ifdef PLAYER_DISP_MVS
 #include "draw.h"
+#endif
 #include "macro.h"
 #include "param.h"
 #include "queue.h"
@@ -19,7 +23,7 @@ Queue audio_queue;
 avparam_t avparam;
 static SDL_Thread *fetch_thread = NULL;
 
-static void sws_freectxp(struct SwsContext **pctx) {
+static inline void sws_freectxp(struct SwsContext **pctx) {
     sws_freeContext(*pctx);
 }
 
@@ -151,6 +155,10 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
         int sample_size = av_get_bytes_per_sample(resampled->format);
         int datasize = resampled->ch_layout.nb_channels *
             resampled->nb_samples * sample_size;
+        // we are scaling the audio as we receive it from the queue
+        // we could instead scale it right before we send it to hw
+        // theoretically, that'd improve the latency of volume ctrl
+        // but it's too minuscule to bother caring about
         float volume = app->muted ? 0 : app->volume;
         for (int i = 0; i < datasize / sample_size; i++) {
             ((float*)resampled->data[0])[i] *= volume;
@@ -166,14 +174,14 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
     }
 }
 
-static void update_frame(App *app) {
+static inline void update_frame(App *app) {
     ASSERT(SDL_SetRenderDrawColor(
                 app->ren, 0x00, 0x2b, 0x36, 0xff) == 0);
     ASSERT(SDL_RenderClear(app->ren) == 0);
     ASSERT(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
 }
 
-static void render_frame(App *app) {
+static inline void render_frame(App *app) {
     SDL_RenderPresent(app->ren);
 }
 
