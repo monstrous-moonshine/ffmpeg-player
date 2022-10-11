@@ -36,14 +36,6 @@ static void main_exit_handler() {
 }
 
 static void rescale_frame(App *app, AVFrame *frame) {
-    int err = av_frame_apply_cropping(frame, 0);
-    if (err < 0) {
-        if (err == AVERROR(ERANGE))
-            LOG_ERROR("Invalid crop parameters in frame\n");
-        else
-            LOG_ERROR("Error cropping frame\n");
-        // but continue, this is no fatal issue
-    }
     _cleanup_(sws_freectxp) struct SwsContext *sws_ctx = NULL;
     sws_ctx = sws_getContext(
             frame->width, frame->height, frame->format,
