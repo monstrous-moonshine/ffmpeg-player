@@ -114,7 +114,7 @@ static void seek(App *app, int delta) {
     avparam.seek_flags = delta < 0 ? AVSEEK_FLAG_BACKWARD : 0;
     avparam.seek_pts = app->pts + delta;
 
-    assert(SDL_LockMutex(avparam.seek_mtx) == 0);
+    ASSERT(SDL_LockMutex(avparam.seek_mtx) == 0);
     avparam.do_seek = true;
     while (avparam.do_seek) {
         // instead of one (potentially infinite) wait, we wait
@@ -125,13 +125,13 @@ static void seek(App *app, int delta) {
         // forever
         int err = SDL_CondWaitTimeout(avparam.seek_done,
                 avparam.seek_mtx, DEFAULT_FRAME_DELAY);
-        assert(err >= 0);
+        ASSERT(err >= 0);
         if (avparam.done) {
-            assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
+            ASSERT(SDL_UnlockMutex(avparam.seek_mtx) == 0);
             return;
         }
     }
-    assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
+    ASSERT(SDL_UnlockMutex(avparam.seek_mtx) == 0);
 
     app->t_start = -1;
 }

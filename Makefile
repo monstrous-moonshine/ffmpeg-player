@@ -1,10 +1,11 @@
-BUILD = debug
-CFLAGS = -Wall -Wextra -ftree-vectorize -fopt-info-vec-optimized
-#CFLAGS += -DQUEUE_LOG_COUNT
+BUILD ?= debug
+CFLAGS = -Wall -Wextra
 ifeq ($(BUILD),debug)
     CFLAGS += -g -Og
 else
-    CFLAGS += -O2 -DNDEBUG
+    CFLAGS += -O2 -ftree-vectorize
+    #CFLAGS += -DNDEBUG
+    #CFLAGS += -fopt-info
 endif
 LDLIBS = -lSDL2 -lavformat -lavcodec -lswresample -lswscale -lavutil -lm
 

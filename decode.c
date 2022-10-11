@@ -14,7 +14,7 @@ extern Queue video_queue;
 extern Queue audio_queue;
 
 static void unlockp(SDL_mutex **pmtx) {
-    assert(SDL_UnlockMutex(*pmtx) == 0);
+    ASSERT(SDL_UnlockMutex(*pmtx) == 0);
 }
 
 static void seek() {
@@ -85,14 +85,14 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
 
 static int put_frame(Queue *queue, AVFrame *frame) {
     _cleanup_(unlockp) SDL_mutex *queue_mtx = queue->mutex;
-    assert(SDL_LockMutex(queue_mtx) == 0);
+    ASSERT(SDL_LockMutex(queue_mtx) == 0);
 
     while (queue->count == QUEUE_MAX) {
         int err;
         do {
             err = SDL_CondWaitTimeout(queue->empty,
                     queue_mtx, DEFAULT_FRAME_DELAY);
-            assert(err >= 0);
+            ASSERT(err >= 0);
 
             if (avparam.do_seek) {
                 av_frame_free(&frame);
@@ -105,7 +105,7 @@ static int put_frame(Queue *queue, AVFrame *frame) {
         } while (err == SDL_MUTEX_TIMEDOUT);
     }
     queue_enqueue(queue, frame);
-    assert(SDL_CondSignal(queue->fill) == 0);
+    ASSERT(SDL_CondSignal(queue->fill) == 0);
 
     return 0;
 }
@@ -121,13 +121,13 @@ int fetch_frames(void *ptr) {
         if (avparam.done)
             return 0;
 
-        assert(SDL_LockMutex(avparam.seek_mtx) == 0);
+        ASSERT(SDL_LockMutex(avparam.seek_mtx) == 0);
         if (avparam.do_seek) {
             seek();
             avparam.do_seek = false;
-            assert(SDL_CondSignal(avparam.seek_done) == 0);
+            ASSERT(SDL_CondSignal(avparam.seek_done) == 0);
         }
-        assert(SDL_UnlockMutex(avparam.seek_mtx) == 0);
+        ASSERT(SDL_UnlockMutex(avparam.seek_mtx) == 0);
 
         _cleanup_(av_frame_free) AVFrame *frame = av_frame_alloc();
         if (!frame) {

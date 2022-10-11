@@ -32,3 +32,8 @@
         fprintf(stderr, "\e[0m"); \
         (void)0; \
     })
+#ifdef NDEBUG
+#define ASSERT(cond) (void)(cond)
+#else
+#define ASSERT(cond) assert(cond)
+#endif

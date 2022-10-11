@@ -56,7 +56,7 @@ static void rescale_frame(App *app, AVFrame *frame) {
 
     uint8_t *pixels[1];
     int      pitch [1];
-    assert(SDL_LockTexture(app->tex,
+    ASSERT(SDL_LockTexture(app->tex,
                 &app->viewport, (void **)pixels, pitch) == 0);
     int ret = sws_scale(
             sws_ctx, (const uint8_t * const *)frame->data,
@@ -135,16 +135,16 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
     }
 
     while (len > 0) {
-        assert(SDL_LockMutex(audio_queue.mutex) == 0);
+        ASSERT(SDL_LockMutex(audio_queue.mutex) == 0);
         if (audio_queue.count == 0) {
-            assert(SDL_UnlockMutex(audio_queue.mutex) == 0);
+            ASSERT(SDL_UnlockMutex(audio_queue.mutex) == 0);
             memset(&stream[out_idx], 0, len);
             return;
         }
         _cleanup_(av_frame_free) AVFrame *frame = NULL;
         frame = queue_dequeue(&audio_queue);
-        assert(SDL_CondSignal(audio_queue.empty) == 0);
-        assert(SDL_UnlockMutex(audio_queue.mutex) == 0);
+        ASSERT(SDL_CondSignal(audio_queue.empty) == 0);
+        ASSERT(SDL_UnlockMutex(audio_queue.mutex) == 0);
 
         _cleanup_(av_frame_free) AVFrame *resampled = NULL;
         resampled = resample_frame(&app->audio_spec, frame);
@@ -167,10 +167,10 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
 }
 
 static void update_frame(App *app) {
-    assert(SDL_SetRenderDrawColor(
+    ASSERT(SDL_SetRenderDrawColor(
                 app->ren, 0x00, 0x2b, 0x36, 0xff) == 0);
-    assert(SDL_RenderClear(app->ren) == 0);
-    assert(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
+    ASSERT(SDL_RenderClear(app->ren) == 0);
+    ASSERT(SDL_RenderCopy(app->ren, app->tex, NULL, NULL) == 0);
 }
 
 static void render_frame(App *app) {
@@ -254,16 +254,16 @@ int main(int argc, char *argv[]) {
             goto do_render;
         }
 
-        assert(SDL_LockMutex(video_queue.mutex) == 0);
+        ASSERT(SDL_LockMutex(video_queue.mutex) == 0);
         if (video_queue.count == 0) {
-            assert(SDL_UnlockMutex(video_queue.mutex) == 0);
+            ASSERT(SDL_UnlockMutex(video_queue.mutex) == 0);
             SDL_Delay(DEFAULT_FRAME_DELAY);
             goto do_render;
         }
         av_frame_free(&frame);
         frame = queue_dequeue(&video_queue);
-        assert(SDL_CondSignal(video_queue.empty) == 0);
-        assert(SDL_UnlockMutex(video_queue.mutex) == 0);
+        ASSERT(SDL_CondSignal(video_queue.empty) == 0);
+        ASSERT(SDL_UnlockMutex(video_queue.mutex) == 0);
         rescale_frame(&app, frame);
 
         long pts = frame->best_effort_timestamp;

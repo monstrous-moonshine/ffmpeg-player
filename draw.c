@@ -7,8 +7,8 @@
 #include "macro.h"
 
 static void draw_arrow(SDL_Renderer *ren, int x1, int y1, int x2, int y2) {
-    assert(SDL_SetRenderDrawColor(ren, 0xff, 0xff, 0xff, 0x3f) == 0);
-    assert(SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND) == 0);
+    ASSERT(SDL_SetRenderDrawColor(ren, 0xff, 0xff, 0xff, 0x3f) == 0);
+    ASSERT(SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND) == 0);
 
     // draw arrow shaft
     (void)SDL_RenderDrawLine(ren, x1, y1, x2, y2);
