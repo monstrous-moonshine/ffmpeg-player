@@ -1,10 +1,9 @@
-#include <assert.h>
 #include <libavcodec/avcodec.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 #include <libavutil/avutil.h>
-#include <libavutil/motion_vector.h>
 #include <SDL2/SDL.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,8 +56,8 @@ static void rescale_frame(App *app, AVFrame *frame) {
 
     uint8_t *pixels[1];
     int      pitch [1];
-    assert(SDL_LockTexture(app->tex, &app->viewport,
-                (void **)pixels, pitch) == 0);
+    assert(SDL_LockTexture(app->tex,
+                &app->viewport, (void **)pixels, pitch) == 0);
     int ret = sws_scale(
             sws_ctx, (const uint8_t * const *)frame->data,
             frame->linesize, 0, frame->height, pixels, pitch);
@@ -142,13 +141,13 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
             memset(&stream[out_idx], 0, len);
             return;
         }
-        _cleanup_(av_frame_free)
-        AVFrame *frame = queue_dequeue(&audio_queue);
+        _cleanup_(av_frame_free) AVFrame *frame = NULL;
+        frame = queue_dequeue(&audio_queue);
         assert(SDL_CondSignal(audio_queue.empty) == 0);
         assert(SDL_UnlockMutex(audio_queue.mutex) == 0);
 
-        _cleanup_(av_frame_free)
-        AVFrame *resampled = resample_frame(&app->audio_spec, frame);
+        _cleanup_(av_frame_free) AVFrame *resampled = NULL;
+        resampled = resample_frame(&app->audio_spec, frame);
         int sample_size = av_get_bytes_per_sample(resampled->format);
         int datasize = resampled->ch_layout.nb_channels *
             resampled->nb_samples * sample_size;
@@ -161,8 +160,8 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
         len -= nwrite;
         out_idx += nwrite;
         if (nwrite < datasize) {
-            memcpy(buffer, &resampled->data[0][nwrite], datasize - nwrite);
             buf_size = datasize - nwrite;
+            memcpy(buffer, &resampled->data[0][nwrite], buf_size);
         }
     }
 }
