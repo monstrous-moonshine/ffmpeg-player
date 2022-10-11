@@ -1,6 +1,6 @@
-#include <assert.h>
 #include <libavformat/avformat.h>
 #include <SDL2/SDL.h>
+#include <assert.h>
 #include <stdio.h>
 #include "app.h"
 #include "macro.h"

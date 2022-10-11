@@ -1,8 +1,8 @@
-#include <assert.h>
-#include <math.h>
-#include <SDL2/SDL.h>
 #include <libavutil/avutil.h>
 #include <libavutil/motion_vector.h>
+#include <SDL2/SDL.h>
+#include <assert.h>
+#include <math.h>
 #include "draw.h"
 #include "macro.h"
 

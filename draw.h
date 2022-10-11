@@ -1,6 +1,6 @@
 #pragma once
-#include <SDL2/SDL.h>
 #include <libavutil/frame.h>
+#include <SDL2/SDL.h>
 
 void draw_motion_vectors(
         AVFrame *frame,

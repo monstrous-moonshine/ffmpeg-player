@@ -3,17 +3,13 @@
 #include <libswscale/swscale.h>
 #include <libavutil/avutil.h>
 #include <SDL2/SDL.h>
-#ifndef NDEBUG
 #include <assert.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
 #include "decode.h"
-#ifdef PLAYER_DISP_MVS
 #include "draw.h"
-#endif
 #include "macro.h"
 #include "param.h"
 #include "queue.h"

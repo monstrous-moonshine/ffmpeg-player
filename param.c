@@ -1,5 +1,6 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include "macro.h"

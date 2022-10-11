@@ -1,8 +1,6 @@
 #include <libavutil/frame.h>
 #include <SDL2/SDL.h>
-#ifdef QUEUE_LOG_COUNT
 #include <stdio.h>
-#endif
 #include "queue.h"
 
 bool queue_init(Queue *queue, const char *name) {
