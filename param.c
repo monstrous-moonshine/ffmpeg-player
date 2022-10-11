@@ -102,6 +102,7 @@ bool avparam_init(avparam_t *param, const char *url) {
 void avparam_fini(avparam_t *param) {
     avcodec_free_context(&param->video_ctx);
     avcodec_free_context(&param->audio_ctx);
+    avcodec_free_context(&param->sub_ctx);
     avformat_close_input(&param->avctx);
     SDL_DestroyCond(param->seek_done);
     SDL_DestroyMutex(param->seek_mtx);

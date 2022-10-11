@@ -35,6 +35,35 @@ static void seek() {
     queue_flush(&audio_queue);
 }
 
+static void dump_subtitle(AVPacket *pkt) {
+    AVSubtitle *sub = av_malloc(sizeof *sub);
+    ASSERT(sub);
+    int got_sub;
+    int err = avcodec_decode_subtitle2(avparam.sub_ctx,
+            sub, &got_sub, pkt);
+    if (err < 0 || got_sub == 0) {
+        av_freep(&sub);
+    } else {
+        for (int i = 0; i < (int)sub->num_rects; i++) {
+            switch (sub->rects[i]->type) {
+            case SUBTITLE_BITMAP:
+                printf("BITMAP: %dx%d\n", sub->rects[i]->w,
+                        sub->rects[i]->h);
+                break;
+            case SUBTITLE_TEXT:
+                printf("TEXT: %s\n", sub->rects[i]->text);
+                break;
+            case SUBTITLE_ASS:
+                printf("ASS: %s\n", sub->rects[i]->ass);
+                break;
+            default:
+                break;
+            }
+        }
+        avsubtitle_free(sub);
+    }
+}
+
 static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
         int *stream_index) {
     int err;
@@ -63,6 +92,9 @@ static int read_frame(AVCodecContext **pcodec_ctx, AVFrame *frame,
                 ? avparam.audio_ctx
                 : NULL;
             *stream_index = pkt->stream_index;
+            if (pkt->stream_index == avparam.sub_si) {
+                dump_subtitle(pkt);
+            }
         } while (!*pcodec_ctx);
 
         err = avcodec_send_packet(*pcodec_ctx, pkt);
