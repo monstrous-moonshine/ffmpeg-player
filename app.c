@@ -148,8 +148,6 @@ static void toggle_pause(App *app) {
 }
 
 void process_events(App *app) {
-    static SDL_Keymod mod = (
-            KMOD_CTRL | KMOD_SHIFT | KMOD_ALT | KMOD_GUI);
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         switch (e.type) {
@@ -158,8 +156,6 @@ void process_events(App *app) {
             avparam.done = true;
             break;
         case SDL_KEYDOWN:
-            if (e.key.keysym.mod & mod)
-                break;
             switch (e.key.keysym.sym) {
             case SDLK_q:
                 app->done = true;
