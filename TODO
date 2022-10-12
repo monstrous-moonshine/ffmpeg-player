@@ -1,3 +1,5 @@
+render frame at seek and window resize while paused
+make repeated key work for seek
 use actual timebase instead of hardcoded 1/1000
 render subtitles to window instead of stdout
 statistics on I/P/B frame ordering, size
