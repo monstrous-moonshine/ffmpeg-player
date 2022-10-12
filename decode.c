@@ -19,6 +19,9 @@ static inline void unlockp(SDL_mutex **pmtx) {
 }
 
 static void seek() {
+    // TODO: explicitly pass a stream index instead of -1
+    // and adjust the seek pts accordingly
+    // NOTE: we hold the lock for avparam
     int err = av_seek_frame(avparam.avctx, -1,
             avparam.seek_pts * 1000,
             avparam.seek_flags);
@@ -28,11 +31,23 @@ static void seek() {
         return;
     }
     /* avformat_flush(thread_params.avctx); */
-    avcodec_flush_buffers(avparam.audio_ctx);
-    avcodec_flush_buffers(avparam.video_ctx);
 
+    avcodec_flush_buffers(avparam.video_ctx);
+    avcodec_flush_buffers(avparam.audio_ctx);
+    if (avparam.sub_ctx)
+        avcodec_flush_buffers(avparam.sub_ctx);
+
+    // locking the video_queue isn't necessary, since the
+    // main thread, which uses it, is stalled waiting for
+    // the seek to finish
     queue_flush(&video_queue);
+
+    // locking the audio queue IS necessary, since the
+    // audio callback, which uses it, runs asynchronously,
+    // and might be trying to pop frames from it
+    ASSERT(SDL_LockMutex(audio_queue.mutex) == 0);
     queue_flush(&audio_queue);
+    ASSERT(SDL_UnlockMutex(audio_queue.mutex) == 0);
 }
 
 static void dump_subtitle(AVPacket *pkt) {
