@@ -14,9 +14,9 @@
 #include "param.h"
 #include "queue.h"
 
-Queue video_queue;
-Queue audio_queue;
-avparam_t avparam;
+Queue video_queue = {};
+Queue audio_queue = {};
+avparam_t avparam = {};
 static SDL_Thread *fetch_thread = NULL;
 
 static inline void sws_freectxp(struct SwsContext **pctx) {
@@ -176,9 +176,6 @@ static inline void render_frame(App *app) {
 int main(int argc, char *argv[]) {
     _cleanup_(av_frame_free) AVFrame *frame = NULL;
     _cleanup_(app_fini) App app = {};
-    avparam = (avparam_t) {};
-    video_queue = (Queue) {};
-    audio_queue = (Queue) {};
 
     if (argc < 2) {
         fprintf(stderr, "Usage: %s input_file\n", argv[0]);
