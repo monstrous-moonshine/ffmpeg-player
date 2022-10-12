@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    while (!app.done) {
+    while (!avparam.done) {
         process_events(&app);
         if (app.resized) {
             SDL_DestroyTexture(app.tex);

@@ -148,13 +148,11 @@ void process_events(App *app) {
     while (SDL_PollEvent(&e)) {
         switch (e.type) {
         case SDL_QUIT:
-            app->done = true;
             avparam.done = true;
             break;
         case SDL_KEYDOWN:
             switch (e.key.keysym.sym) {
             case SDLK_q:
-                app->done = true;
                 avparam.done = true;
                 break;
             case SDLK_SPACE:

@@ -29,7 +29,6 @@ typedef struct {
     int width;
     int height;
     bool resized;
-    bool done;
 } App;
 
 bool app_init(App *app,
