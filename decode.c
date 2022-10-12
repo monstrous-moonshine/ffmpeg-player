@@ -3,6 +3,9 @@
 #include <libavutil/avutil.h>
 #include <SDL2/SDL.h>
 #include <assert.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include "decode.h"
 #include "macro.h"
 #include "param.h"
