@@ -7,9 +7,6 @@
 #include "macro.h"
 
 static void draw_arrow(SDL_Renderer *ren, int x1, int y1, int x2, int y2) {
-    ASSERT(SDL_SetRenderDrawColor(ren, 0xff, 0xff, 0xff, 0x3f) == 0);
-    ASSERT(SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND) == 0);
-
     // draw arrow shaft
     (void)SDL_RenderDrawLine(ren, x1, y1, x2, y2);
 
@@ -32,15 +29,18 @@ void draw_motion_vectors(
         SDL_Renderer *ren,
         SDL_Rect *viewport
         ) {
-    AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
+    AVFrameSideData *side_data = av_frame_get_side_data(frame,
+            AV_FRAME_DATA_MOTION_VECTORS);
     if (!side_data)
         return;
     AVMotionVector *motion_vec = (AVMotionVector *)side_data->data;
     int nb_motion_vec = side_data->size / sizeof *motion_vec;
-    int x = viewport->x;
-    int y = viewport->y;
+    ASSERT(SDL_SetRenderDrawColor(ren, 0xff, 0xff, 0xff, 0x3f) == 0);
+    ASSERT(SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND) == 0);
     float xr = (float)viewport->w / frame->width;
     float yr = (float)viewport->h / frame->height;
+    int x = viewport->x;
+    int y = viewport->y;
     for (int i = 0; i < nb_motion_vec; i++) {
         int x1, y1, x2, y2;
         if (motion_vec[i].source < 0) {
