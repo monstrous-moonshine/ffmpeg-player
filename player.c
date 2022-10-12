@@ -137,6 +137,7 @@ static void audio_callback(void *ptr, uint8_t *stream, int len) {
         frame = queue_dequeue(&audio_queue);
         ASSERT(SDL_CondSignal(audio_queue.empty) == 0);
         ASSERT(SDL_UnlockMutex(audio_queue.mutex) == 0);
+        app->pts = frame->best_effort_timestamp;
 
         _cleanup_(av_frame_free) AVFrame *resampled = NULL;
         resampled = resample_frame(&app->audio_spec, frame);
@@ -259,14 +260,10 @@ int main(int argc, char *argv[]) {
         ASSERT(SDL_UnlockMutex(video_queue.mutex) == 0);
         rescale_frame(&app, frame);
 
+        while (app.pts < 0)
+            ;
         long pts = frame->best_effort_timestamp;
-        if (app.t_start == -1) {
-            app.t_start = SDL_GetTicks64() - pts;
-        }
-        app.pts = pts;
-
-        long t_elapsed = SDL_GetTicks64() - app.t_start;
-        unsigned delay = max(pts - t_elapsed, 0);
+        unsigned delay = max(pts - app.pts, 0);
         SDL_Delay(delay);
 
 do_render:
