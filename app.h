@@ -8,9 +8,8 @@ typedef struct {
 } Rational;
 
 typedef struct {
-    long t_start; // used for video sync
-    long pts;     // used for pause and sync
-    bool paused;  // used for pause, obviously
+    long pts;
+    bool paused;
 
     SDL_AudioDeviceID audio_devID;
     SDL_AudioSpec audio_spec;

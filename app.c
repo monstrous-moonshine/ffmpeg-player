@@ -31,15 +31,12 @@ static void reset_viewport(App *app) {
 bool app_init(App *app,
         SDL_AudioSpec *wanted_spec,
         Rational *display_aspect) {
-    app->t_start = -1;
-
+    app->pts = -1;
     app->display_aspect.num = display_aspect->num;
     app->display_aspect.den = display_aspect->den;
-
     app->volume = 1.0;
     app->width = 640;
     app->height = 480;
-
     reset_viewport(app);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
@@ -140,7 +137,6 @@ static void toggle_pause(App *app) {
     if (app->paused) {
         app->paused = false;
         SDL_PauseAudioDevice(app->audio_devID, 0);
-        app->t_start = -1;
     } else {
         app->paused = true;
         SDL_PauseAudioDevice(app->audio_devID, 1);
