@@ -230,19 +230,8 @@ int main(int argc, char *argv[]) {
     }
 
     while (!avparam.done) {
-        process_events(&app);
-        if (app.resized) {
-            SDL_DestroyTexture(app.tex);
-            app.tex = SDL_CreateTexture(
-                    app.ren, SDL_PIXELFORMAT_RGBA32,
-                    SDL_TEXTUREACCESS_STREAMING,
-                    app.width, app.height);
-            if (!app.tex) {
-                fprintf(stderr, "Error creating texture\n");
-                exit(1);
-            }
-            app.resized = false;
-        }
+        if (!process_events(&app))
+            break;
         if (app.paused) {
             SDL_Delay(DEFAULT_FRAME_DELAY);
             goto do_render;

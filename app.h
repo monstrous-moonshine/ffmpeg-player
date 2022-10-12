@@ -28,11 +28,10 @@ typedef struct {
 
     int width;
     int height;
-    bool resized;
 } App;
 
 bool app_init(App *app,
         SDL_AudioSpec *wanted_spec,
         Rational *display_aspect);
 void app_fini(App *app);
-void process_events(App *app);
+bool process_events(App *app);

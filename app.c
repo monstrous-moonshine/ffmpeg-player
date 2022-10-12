@@ -10,22 +10,31 @@
 
 extern avparam_t avparam;
 
-static void reset_viewport(App *app) {
-    int viewport_width, viewport_height;
+static bool reset_viewport(App *app) {
+    int viewport_w, viewport_h;
     int viewport_x, viewport_y;
     int adj_width, adj_height;
     adj_width = app->height * app->display_aspect.num /
         app->display_aspect.den;
     adj_height = app->width * app->display_aspect.den /
         app->display_aspect.num;
-    viewport_width = min(adj_width, app->width);
-    viewport_height = min(adj_height, app->height);
-    viewport_x = (app->width - viewport_width) / 2;
-    viewport_y = (app->height - viewport_height) / 2;
-    app->viewport.h = viewport_height;
-    app->viewport.w = viewport_width;
+    viewport_w = min(adj_width, app->width);
+    viewport_h = min(adj_height, app->height);
+    viewport_x = (app->width - viewport_w) / 2;
+    viewport_y = (app->height - viewport_h) / 2;
+    app->viewport.h = viewport_h;
+    app->viewport.w = viewport_w;
     app->viewport.x = viewport_x;
     app->viewport.y = viewport_y;
+    app->tex = SDL_CreateTexture(
+            app->ren, SDL_PIXELFORMAT_RGBA32,
+            SDL_TEXTUREACCESS_STREAMING,
+            app->width, app->height);
+    if (!app->tex) {
+        LOG_ERROR("Error creating texture\n");
+        return false;
+    }
+    return true;
 }
 
 bool app_init(App *app,
@@ -37,7 +46,6 @@ bool app_init(App *app,
     app->volume = 1.0;
     app->width = 640;
     app->height = 480;
-    reset_viewport(app);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         LOG_ERROR("Error initializing SDL\n");
@@ -72,14 +80,8 @@ bool app_init(App *app,
         return false;
     }
 
-    app->tex = SDL_CreateTexture(
-            app->ren, SDL_PIXELFORMAT_RGBA8888,
-            SDL_TEXTUREACCESS_STREAMING,
-            app->width, app->height);
-    if (!app->tex) {
-        LOG_ERROR("Error creating texture\n");
+    if (!reset_viewport(app))
         return false;
-    }
 
     SDL_PauseAudioDevice(app->audio_devID, 0);
 
@@ -143,7 +145,7 @@ static void toggle_pause(App *app) {
     }
 }
 
-void process_events(App *app) {
+bool process_events(App *app) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         switch (e.type) {
@@ -191,12 +193,14 @@ void process_events(App *app) {
             if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
                 app->width = e.window.data1;
                 app->height = e.window.data2;
-                app->resized = true;
-                reset_viewport(app);
+                SDL_DestroyTexture(app->tex);
+                if (!reset_viewport(app))
+                    return false;
             }
             break;
         default:
             break;
         }
     }
+    return true;
 }
