@@ -62,11 +62,11 @@ static void dump_subtitle(AVPacket *pkt) {
         for (int i = 0; i < (int)sub->num_rects; i++) {
             switch (sub->rects[i]->type) {
             case SUBTITLE_BITMAP:
-                printf("BITMAP: %dx%d\n", sub->rects[i]->w,
+                printf("BMP: %dx%d\n", sub->rects[i]->w,
                         sub->rects[i]->h);
                 break;
             case SUBTITLE_TEXT:
-                printf("TEXT: %s\n", sub->rects[i]->text);
+                printf("TXT: %s\n", sub->rects[i]->text);
                 break;
             case SUBTITLE_ASS:
                 printf("ASS: %s\n", sub->rects[i]->ass);
