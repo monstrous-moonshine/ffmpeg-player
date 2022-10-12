@@ -3,8 +3,9 @@ CFLAGS = -Wall -Wextra
 ifeq ($(BUILD),debug)
     CFLAGS += -g -Og
 else
-    CFLAGS += -O2 -ftree-vectorize
-    CFLAGS += -march=native
+    CFLAGS += -O2
+    #CFLAGS += -ftree-vectorize
+    #CFLAGS += -march=native
     #CFLAGS += -mtune=native
     #CFLAGS += -DNDEBUG
     #CFLAGS += -fopt-info
