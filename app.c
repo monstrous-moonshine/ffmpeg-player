@@ -145,6 +145,15 @@ static void toggle_pause(App *app) {
     }
 }
 
+static void toggle_fullscreen(App *app) {
+    if (!app->fullscreen) {
+        SDL_SetWindowFullscreen(app->win, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    } else {
+        SDL_SetWindowFullscreen(app->win, 0);
+    }
+    app->fullscreen = !app->fullscreen;
+}
+
 bool process_events(App *app) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
@@ -162,6 +171,9 @@ bool process_events(App *app) {
                 break;
             case SDLK_m:
                 app->muted = !app->muted;
+                break;
+            case SDLK_f:
+                toggle_fullscreen(app);
                 break;
             case SDLK_9:
                 app->volume = max(app->volume - 0.05f, 0.0f);
@@ -191,8 +203,10 @@ bool process_events(App *app) {
             break;
         case SDL_WINDOWEVENT:
             if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
+                //printf("%dx%d -> ", app->width, app->height);
                 app->width = e.window.data1;
                 app->height = e.window.data2;
+                //printf("%dx%d\n", app->width, app->height);
                 SDL_DestroyTexture(app->tex);
                 if (!reset_viewport(app))
                     return false;

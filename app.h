@@ -28,6 +28,7 @@ typedef struct {
 
     int width;
     int height;
+    bool fullscreen;
 } App;
 
 bool app_init(App *app,
