@@ -80,6 +80,8 @@ bool avparam_init(avparam_t *param, const char *url) {
         ret = get_codec_context(param->avctx,
                 param->sub_si, &param->sub_ctx);
         if (!ret) return false;
+        printf("%.*s\n", param->sub_ctx->subtitle_header_size,
+                param->sub_ctx->subtitle_header);
     }
 
     param->seek_mtx = SDL_CreateMutex();
